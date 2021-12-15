@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package protolca.services;
+
+option java_package = "org.openlca.proto.grpc";
+option java_multiple_files = true;
+option java_outer_classname = "ResultServiceProto";
+
+option csharp_namespace = "ProtoLCA.Services";
+option go_package = ".;protolca";
+
+import "google/protobuf/empty.proto";
+import "olca.proto";
+import "commons.proto";
+
+service ResultService {
+
+  // Calculates a result for the given calculation setup.
+  rpc Calculate(ProtoCalculationSetup) returns (ProtoResultRef);
+
+  // Get all technosphere flows of the underlying product system of the given
+  // result.
+  rpc GetTechFlows(ProtoResultRef) returns (stream ProtoTechFlow);
+
+  // Get the environmental flows of the given result.
+  rpc GetEnviFlows(ProtoResultRef) returns (stream ProtoEnviFlow);
+
+  // Get the impact categories of the given result.
+  rpc GetImpactCategories(ProtoResultRef) returns (stream ProtoRef);
+
+  // Get the inventory of the given result.
+  rpc GetTotalInventory(ProtoResultRef) returns (stream ResultValue);
+
+  // Get the total impact assessment result of the given result.
+  rpc GetTotalImpacts(ProtoResultRef) returns (stream ResultValue);
+
+  // Get the direct contribution of a TechFlow to a flow, impact, or cost
+  // result. 'Direct' means that this is only the contribution that is
+  // directly associated with the production of a product or treatment of
+  // a waste flow excluding contributions of upstream and downstream processes.
+  rpc GetDirectContribution(TechFlowContributionRequest) returns (ResultValue);
+
+  rpc GetTotalContribution(TechFlowContributionRequest) returns (ResultValue);
+
+  rpc GetTotalContributionOfOne(TechFlowContributionRequest) returns (ResultValue);
+
+  // Get the used impact factors of a result. The request can be for:
+  //
+  // * an indicator: returns the non-zero factors of that indicator
+  // * a flow: returns the factors of that flow for all indicators (including
+  //   zero values)
+  // * an indicator and flow: returns the factor for that flow which may be zero
+  //
+  // Nothing is returned if no indicator and flow is given or if the result does
+  // not have an impact assessment result.
+  rpc GetImpactFactors(ImpactFactorRequest) returns
+      (stream ImpactFactorResponse);
+
+  // Disposes the given result on the server side.
+  rpc Dispose(ProtoResultRef) returns (google.protobuf.Empty);
+
+}
+
+// A `ProtoResultRef` message is just a reference to a real result on the server
+// side. As result data can be really large, we do not add them directly to the
+// result. Instead you call the respective methods of the result service to get
+// them. Because of this, you need to explicitly call `Dispose` when you do not
+// need a result anymore. Otherwise you will create memory leaks as the result
+// still exists on the server side.
+message ProtoResultRef {
+  string id = 1 [json_name = "@id"];
+}
+
+message ImpactFactorRequest {
+  ProtoResultRef result = 1;
+  ProtoRef indicator = 2;
+  ProtoEnviFlow flow = 3;
+}
+
+message ImpactFactorResponse {
+  ProtoRef indicator = 1;
+  ProtoEnviFlow flow = 2;
+  double value = 3;
+}
+
+// The request for a contribution result of a tech-flow.
+message TechFlowContributionRequest {
+  ProtoResultRef result = 1;
+  ProtoTechFlow tech_flow = 2;
+  oneof result_ref {
+    ProtoEnviFlow envi_flow = 3;
+    ProtoRef impact = 4;
+    bool costs = 5;
+  }
+}
+
+message ResultValue {
+  double value = 1;
+  oneof result_reference {
+    ProtoTechFlow tech_flow = 2;
+    ProtoEnviFlow envi_flow = 3;
+    ProtoRef impact = 4;
+    bool costs = 5;
+  }
+}
